@@ -1,134 +1,109 @@
-import bindAll from 'lodash.bindall';
-import navigator from 'jzz';
+import { Commands, commandTable, commandIndex } from './commands';
 
-interface MIDIDevice {
-    id: string;
-    name?: string;
-    manufacturer?: string;
-    open: () => void;
-    close: () => void;
-}
+import type { ValueOf } from './utils';
 
-interface MIDIDeviceRegistry {
-    inputs: MIDIDevice[];
-    outputs: MIDIDevice[];
-}
 
-type NoteOnHandler = (key: number, velocity: number) => void;
-type NoteOffHandler = (key: number) => void;
-type DeviceChangeHandler = (devices: MIDIDeviceRegistry) => void;
+const Event = {
+  NOTE_ON: Commands.NOTE_ON,
+  NOTE_OFF: Commands.NOTE_ON,
+  PITCH_BEND: Commands.PITCH_BEND,
+} as const;
 
-export const EMPTY_DEVICE_REGISTRY = {
-    inputs: [],
-    outputs: [],
-};
+type Event = ValueOf<typeof Event>;
+
+const AccessStatus = {
+  UNREQUESTED: 'unrequested',
+  ACCEPTED: 'accepted',
+  DENIED: 'denied',
+} as const;
+
+type EventHandler<T = any> = (event: T) => void;
+type MidiMessageHandler = ((channel: number, dataByte1: number, dataByte2: number) => void)
+  | ((channel: number, dataByte: number) => void);
+
 
 export default class HuMIDI {
-    private access?: WebMidi.MIDIAccess;
-    private onNoteOnCallbacks: NoteOnHandler[] = [];
-    private onNoteOffCallbacks: NoteOffHandler[] = [];
-    private onDeviceRegistryChangeCallbacks: DeviceChangeHandler[] = [];
+  private static eventHandlers: Map<ValueOf<typeof Event>, Set<EventHandler>> = new Map();
+  private static accessStatus:  ValueOf<typeof AccessStatus> = AccessStatus.UNREQUESTED;
+  private static midiAccess?: WebMidi.MIDIAccess;
+  private static readonly commandHandler: Record<ValueOf<typeof Commands>, MidiMessageHandler>= {
+    [Commands.NOTE_ON]: this.onNoteOn,
+    [Commands.NOTE_OFF]: this.onNoteOff,
+    [Commands.PITCH_BEND]: this.onPitchBend,
+  };
 
-    deviceRegistry: MIDIDeviceRegistry = EMPTY_DEVICE_REGISTRY;
-
-    constructor() {
-        bindAll(this, [
-            'onAccess',
-            'onInternalMessage',
-            'onInternalStateChange',
-            'initializeInput',
-            'initializeOutput',
-        ]);
-
-        navigator.requestMIDIAccess().then(
-            this.onAccess,
-            err => {throw new Error(`Error getting MIDI access: ${err}`);},
-        );
+  static async requestAccess() {
+    if (this.accessStatus !== AccessStatus.UNREQUESTED) {
+      return;
     }
 
-    private initializeInput(input: WebMidi.MIDIInput) {
-        this.deviceRegistry.inputs.push(this.getDeviceFromIO(input));
-        input.onmidimessage = this.onInternalMessage;
-        input.onstatechange = this.onInternalStateChange;
+    try {
+      this.midiAccess = await navigator.requestMIDIAccess();
+    } catch (err) {
+      throw new Error('MIDI permissions denied');
     }
 
-    private initializeOutput(output: WebMidi.MIDIOutput) {
-        this.deviceRegistry.outputs.push(this.getDeviceFromIO(output));
-        output.onstatechange = this.onInternalStateChange;
+    this.midiAccess.inputs.forEach(input => {
+      input.onmidimessage = this.onMessage;
+    });
+  }
+
+  public static on(event: ValueOf<typeof Event>, handler: EventHandler) {
+    if (!this.eventHandlers.get(event)) {
+      this.eventHandlers.set(event, new Set());
     }
 
-    private onAccess(access: WebMidi.MIDIAccess) {
-        this.access = access;
+    const handlers = this.eventHandlers.get(event)!;
+    handlers.add(handler);
+  }
 
-        access.inputs.forEach(this.initializeInput);
-        access.outputs.forEach(this.initializeOutput);
+  public static off(event: ValueOf<typeof Event>, handler: EventHandler) {
+    const handlers = this.eventHandlers.get(event);
+    handlers?.delete(handler);
+  }
+
+  private static emit(event: Event, payload: Record<string, any>) {
+    const handlers = this.eventHandlers.get(event);
+    handlers?.forEach(handler => handler(payload));
+  }
+
+  private static onMessage(midiMessage: WebMidi.MIDIMessageEvent) {
+    const [statusByte, dataByte1, dataByte2] = midiMessage.data;
+
+    const command = commandTable[statusByte];
+    if (command === undefined) {
+      return;
     }
 
-    private syncIO() {
-        if (!this.access) {
-            throw new Error('Cannot reset input/output without MIDI access');
-        }
-
-        this.deviceRegistry.inputs = [];
-        this.deviceRegistry.outputs = [];
-
-        // these inputs/outputs are map-like, we can't use native .map
-        this.access.inputs.forEach((input: WebMidi.MIDIInput) => {
-            this.deviceRegistry.inputs.push(this.getDeviceFromIO(input));     
-        });
-
-        this.access.outputs.forEach((output: WebMidi.MIDIOutput) => {
-            this.deviceRegistry.outputs.push(this.getDeviceFromIO(output));     
-        });
+    const channel = statusByte - commandIndex[command];
+    const handler = this.commandHandler[command];
+    if (!handler) {
+      return;
     }
 
-    private getDeviceFromIO(io: WebMidi.MIDIInput | WebMidi.MIDIOutput): MIDIDevice {
-        const {id, name, manufacturer, open, close} = io;
-        return {id, name, manufacturer, open, close};
-    }
+    handler(channel, dataByte1, dataByte2);
+  }
 
-    private onInternalStateChange() {
-        this.syncIO();
+  private static onNoteOn(channel: number, note: number, velocity: number) {
+    this.emit(Event.NOTE_ON, {
+      note,
+      velocity,
+      channel,
+    });
+  }
 
-        this.onDeviceRegistryChangeCallbacks.forEach(onDeviceChange => {
-            onDeviceChange({...this.deviceRegistry});
-        });
-    }
+  private static onNoteOff(channel: number, note: number) {
+    this.emit(Event.NOTE_ON, {
+      note,
+      channel,
+    });
+  }
 
-    private onInternalMessage({data}: WebMidi.MIDIMessageEvent) {
-        const command = data[0];
-        const midi = data[1];
-        const velocity = data[2];
-        
-        if (command !== 144) {
-            // Ignore messages not related to note changes
-            return;
-        }
-
-        const key = midi - 12;
-
-        if (velocity) {
-            this.onNoteOnCallbacks.forEach(onNoteOn => {
-                onNoteOn(key, velocity);
-            });
-
-            return;
-        }
-
-        this.onNoteOffCallbacks.forEach(onNoteOff => {
-            onNoteOff(key);
-        })
-    }
-
-    onNoteOn(callback: NoteOnHandler): void {
-        this.onNoteOnCallbacks.push(callback);
-    }
-
-    onNoteOff(callback: NoteOffHandler): void {
-        this.onNoteOffCallbacks.push(callback);
-    }
-
-    onDeviceChange(callback: DeviceChangeHandler): void {
-        this.onDeviceRegistryChangeCallbacks.push(callback);
-    }
+  private static onPitchBend(channel: number, lsb: number, msb: number) {
+    this.emit(Event.NOTE_ON, {
+      lsb,
+      msb,
+      channel,
+    });
+  }
 }

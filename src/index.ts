@@ -1,1 +1,1 @@
-export {default} from './humidi';
+export { default } from './humidi';
