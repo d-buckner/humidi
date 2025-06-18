@@ -24,22 +24,27 @@ export type NoteOffEvent = {
   note: number,
 };
 
+export type PitchBendEvent = {
+  value: number,
+};
+
+type Channel = number;
 type Event = ValueOf<typeof Event>;
 
-const AccessStatus = {
+export const AccessStatus = {
   UNREQUESTED: 'unrequested',
   ACCEPTED: 'accepted',
   DENIED: 'denied',
 } as const;
-type AccessStatus = ValueOf<typeof AccessStatus>;
+export type AccessStatus = ValueOf<typeof AccessStatus>;
 
 type EventHandler<T = any> = (event: T) => void;
-type MidiMessageHandler = ((channel: number, dataByte1: number, dataByte2: number) => void)
-  | ((channel: number, dataByte: number) => void);
+type MidiMessageHandler = ((channel: number, data1: number, data2: number) => void)
+  | ((channel: number, data: number) => void);
 
 
 export default class HuMIDI {
-  private static eventHandlersByChannel: Map<number, Map<Event, Set<EventHandler>>> = new Map();
+  private static eventHandlersByChannel: Map<Channel, Map<Event, Set<EventHandler>>> = new Map();
   private static accessStatus:  AccessStatus = AccessStatus.UNREQUESTED;
   private static midiAccess?: WebMidi.MIDIAccess;
   private static readonly commandHandler: Record<Command, MidiMessageHandler> = {
@@ -66,6 +71,10 @@ export default class HuMIDI {
     });
   }
 
+  public static getAccessStatus() {
+    return HuMIDI.accessStatus;
+  }
+
   public static on(event: Event, handler: EventHandler, channel = -1) {
     if (!HuMIDI.eventHandlersByChannel.get(channel)) {
       HuMIDI.eventHandlersByChannel.set(channel, new Map());
@@ -84,6 +93,10 @@ export default class HuMIDI {
     HuMIDI.getEventHandlers(event, channel)?.delete(handler);
   }
 
+  public static unsubscribeToChannel(channel: number) {
+    HuMIDI.eventHandlersByChannel.delete(channel);
+  }
+
   private static emit(event: Event, payload: Record<string, any>, channel = -1) {
     HuMIDI.getEventHandlers(event, channel)?.forEach(handler => handler(payload));
     HuMIDI.getEventHandlers(event, -1)?.forEach(handler => handler(payload));
@@ -95,21 +108,21 @@ export default class HuMIDI {
   }
 
   private static onMessage(midiMessage: WebMidi.MIDIMessageEvent) {
-    const [statusByte, dataByte1, dataByte2] = midiMessage.data;
+    const [status, data1, data2] = midiMessage.data;
 
-    const command = commandTable[statusByte];
+    const command = commandTable[status];
     if (command === undefined) {
       // currently unsupported command
       return;
     }
 
-    const channel = statusByte - commandIndex[command];
+    const channel = status - commandIndex[command];
     const handler = HuMIDI.commandHandler[command];
     if (!handler) {
       return;
     }
 
-    handler(channel, dataByte1, dataByte2);
+    handler(channel, data1, data2);
   }
 
   private static onNoteOn(channel: number, note: number, velocity: number) {
@@ -136,9 +149,9 @@ export default class HuMIDI {
   }
 
   private static onPitchBend(channel: number, lsb: number, msb: number) {
+    const rawValue = (msb << 7) + lsb;
     HuMIDI.emit(Event.PITCH_BEND, {
-      lsb,
-      msb,
+        value: (rawValue - 8192) / 8192,
     }, channel);
   }
 }

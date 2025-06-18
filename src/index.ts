@@ -1,1 +1,7 @@
 export { default } from './humidi';
+
+export type {
+  NoteOnEvent,
+  NoteOffEvent,
+  PitchBendEvent,
+} from './humidi';
