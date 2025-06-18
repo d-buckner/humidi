@@ -6,21 +6,21 @@ Currently handles simple use cases for note event.
 
 ```typescript
 import HuMIDI, {
-	type NoteOnEvent,
-	type NoteOffEvent,
-    type PitchBendEvent,
+  type NoteOnEvent,
+  type NoteOffEvent,
+  type PitchBendEvent,
 } from 'humidi';
 // request midi access
 HuMIDI.requestAccess().then(() => console.log('MIDI permissions accepted');
 
 // listen for note presses
 HuMIDI.on('noteon', (noteEvent: NoteOnEvent) => {
-	console.log(`Note ${note} pressed with velocity ${velocity}`);
+  console.log(`Note ${note} pressed with velocity ${velocity}`);
 });
 
 // listen for note releases
 HuMIDI.on('noteoff', (noteEvent: NoteOffEvent) => {
-	console.log(`Note ${note} released`);
+  console.log(`Note ${note} released`);
 });
 
 // listen for note presses only on channel0
@@ -31,6 +31,6 @@ HuMIDI.unsubscribeToChannel(0);
 
 // listen for pitch bends
 HuMIDI.on('pitchbend', (pitchBendEvent: PitchBendEvent) => {
-    console.log(`${pitchBendEvent.value * 100}% pitch bend`);
+  console.log(`${pitchBendEvent.value * 100}% pitch bend`);
 });
 ```
