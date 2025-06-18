@@ -17,6 +17,9 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Install vitest globally
+        run: npm install -g vitest
+
       - name: Run tests
         run: npm test
 
