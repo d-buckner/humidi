@@ -5,7 +5,7 @@ import {
   vi,
   beforeEach,
 } from 'vitest';
-import HuMIDI from '../src/HuMIDI';
+import HuMIDI from '@/humidi';
 
 
 interface PitchBendTestCase {

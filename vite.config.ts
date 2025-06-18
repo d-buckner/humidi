@@ -1,3 +1,4 @@
+import path from 'path';
 import { defineConfig } from 'vite';
 import dts from 'vite-plugin-dts';
 
@@ -9,13 +10,11 @@ export default defineConfig({
     }),
   ],
   build: {
-    rollupOptions: {
-      input: 'src/index.ts',
-      output: {
-        entryFileNames: '[name].js',
-        chunkFileNames: '[name].js',
-        assetFileNames: '[name].[ext]'
-      }
-    }
+    lib: {
+      entry: path.resolve(__dirname, 'src/index.ts'),
+      name: 'humidi',
+      fileName: 'index',
+      formats: ['es'],
+    },
   },
 });
