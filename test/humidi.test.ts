@@ -5,7 +5,7 @@ import {
   vi,
   beforeEach,
 } from 'vitest';
-import HuMIDI from '@/humidi';
+import HuMIDI, { AccessStatus } from '@/humidi';
 
 
 interface PitchBendTestCase {
@@ -38,11 +38,7 @@ const testCases: PitchBendTestCase[] = [
 describe('HuMIDI', () => {
   beforeEach(() => {
     navigator.requestMIDIAccess = vi.fn();
-    // Reset static state
-    (HuMIDI as any).eventHandlersByChannel = new Map();
-    (HuMIDI as any).accessStatus = 'unrequested';
-    (HuMIDI as any).midiAccess = undefined;
-
+    HuMIDI.reset();
     vi.clearAllMocks();
     mockMIDIInput.onmidimessage = null;
   });
@@ -54,7 +50,7 @@ describe('HuMIDI', () => {
       await HuMIDI.requestAccess();
 
       expect(navigator.requestMIDIAccess).toHaveBeenCalled();
-      expect(HuMIDI.getAccessStatus()).toBe('accepted');
+      expect(HuMIDI.getAccessStatus()).toBe(AccessStatus.ACCEPTED);
       expect(mockMIDIInput.onmidimessage).not.toBeNull();
     });
 
