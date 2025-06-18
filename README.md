@@ -1,6 +1,6 @@
 # humidi
 
-Simple and lightweight MIDI library for humans. Zero dependencies, less than 1kB gzipped.
+Simple and lightweight MIDI library for humans. Zero dependencies, less than 5kB gzipped.
 
 Currently handles simple use cases for note event.
 
