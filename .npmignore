@@ -3,6 +3,7 @@
 /node_modules/
 .gitignore
 .npmignore
+/.github/
 vite.config.ts
 tsconfig.json
 package-lock.json
