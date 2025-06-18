@@ -12,13 +12,15 @@ export const Commands = {
   PITCH_BEND: 'pitchbend',
 } as const;
 
-export const commandIndex = {
+export type Command = ValueOf<typeof Commands>;
+
+export const commandIndex: Record<Command, number> = {
   [Commands.NOTE_OFF]: 128,
   [Commands.NOTE_ON]: 144,
   [Commands.PITCH_BEND]: 224,
 } as const;
 
-export const commandTable: Record<string, ValueOf<typeof Commands>> = {
+export const commandTable: Record<string, Command> = {
   128: Commands.NOTE_OFF,
   129: Commands.NOTE_OFF,
   130: Commands.NOTE_OFF,

@@ -1,16 +1,19 @@
 {
   "name": "humidi",
-  "private": true,
-  "version": "0.0.0",
+  "author": "d-buckner",
+  "private": false,
+  "version": "0.1.1",
   "type": "module",
+  "main": "dist/index.js",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "test": "vitest"
   },
   "devDependencies": {
     "@types/webmidi": "^2.1.0",
     "typescript": "~5.8.3",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "vite-plugin-dts": "^4.5.4"
   }
 }

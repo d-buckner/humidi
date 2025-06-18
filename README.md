@@ -1,26 +1,24 @@
 # humidi
 
-TypeScript MIDI library for humans. Simple and lightweight abstraction of the [Web MIDI API](https://www.w3.org/TR/webmidi/).
+Simple and lightweight MIDI library for humans. Zero dependencies, less than 1kB gzipped.
 
-Currently handles simple use cases for note and connection events.
+Currently handles simple use cases for note event.
 
-```javascript
+```typescript
+import HuMIDI, {
+	type NoteOnEvent,
+	type NoteOffEvent,
+} from 'humidi';
 // request midi access
-const humidi = new HuMIDI();
+await HuMIDI.requestAccess();
 
 // listen to note presses
-humidi.onNoteOn((key, velocity) => {
-	console.log(`Key ${key} pressed with velocity ${velocity}`);
+HuMIDI.on('noteon', (noteEvent: NoteOnEvent) => {
+	console.log(`Note ${note} pressed with velocity ${velocity}`);
 });
 
 // listen to note releases
-humidi.onNoteOff(key => {
-    console.log(`Key ${key} released`);
-});
-
-// listen to device changes
-humidi.onDeviceChange(devices => {
-	console.log('Input devices', devices.inputs);
-	console.log('Output devices', devices.outputs);
+HuMIDI.on('noteoff', (noteEvent: NoteOffEvent) => {
+	console.log(`Note ${note} released`);
 });
 ```
