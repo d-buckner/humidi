@@ -5,5 +5,6 @@
 .npmignore
 /.github/
 vite.config.ts
+vitest.config.ts
 tsconfig.json
 package-lock.json

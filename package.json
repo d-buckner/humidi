@@ -2,13 +2,16 @@
   "name": "humidi",
   "author": "d-buckner",
   "private": false,
-  "version": "0.1.4",
+  "license": "MIT",
+  "version": "0.1.6",
   "type": "module",
   "main": "dist/index.js",
+  "repository": "https://github.com/d-buckner/humidi",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "test": "vitest"
+    "test": "vitest",
+    "publish": "npm run build && npm publish"
   },
   "devDependencies": {
     "@types/node": "^24.0.3",
