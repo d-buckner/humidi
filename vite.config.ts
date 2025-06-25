@@ -1,17 +1,21 @@
 import path from 'path';
 import { defineConfig } from 'vite';
 import dts from 'vite-plugin-dts';
-
+import terser from '@rollup/plugin-terser';
 
 export default defineConfig({
   plugins: [
     dts({
       insertTypesEntry: true,
+      rollupTypes: true,
     }),
   ],
   build: {
+    rollupOptions: {
+      plugins: terser()
+    },
     lib: {
-      entry: path.resolve(__dirname, 'src/index.ts'),
+      entry: 'src/index.ts',
       name: 'humidi',
       fileName: 'index',
       formats: ['es'],

@@ -14,6 +14,7 @@
     "publish": "npm run build && npm publish"
   },
   "devDependencies": {
+    "@rollup/plugin-terser": "^0.4.4",
     "@types/node": "^24.0.3",
     "@types/webmidi": "^2.1.0",
     "@vitest/coverage-istanbul": "^3.2.4",
