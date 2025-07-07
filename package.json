@@ -1,17 +1,24 @@
 {
   "name": "humidi",
   "author": "d-buckner",
-  "private": false,
   "license": "MIT",
-  "version": "0.1.7",
+  "version": "1.0.0",
   "type": "module",
   "main": "dist/index.js",
-  "repository": "https://github.com/d-buckner/humidi",
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/d-buckner/humidi.git"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "test": "vitest",
-    "publish": "npm run build && npm publish"
+    "release": "npm run build && npm publish"
   },
   "devDependencies": {
     "@rollup/plugin-terser": "^0.4.4",
