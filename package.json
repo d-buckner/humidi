@@ -3,7 +3,7 @@
   "author": "d-buckner",
   "private": false,
   "license": "MIT",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "type": "module",
   "main": "dist/index.js",
   "repository": "https://github.com/d-buckner/humidi",

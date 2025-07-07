@@ -10,6 +10,7 @@ export const Commands = {
   NOTE_OFF: 'noteoff',
   NOTE_ON: 'noteon',
   PITCH_BEND: 'pitchbend',
+  CONTROL_CHANGE: 'controlchange',
 } as const;
 
 export type Command = ValueOf<typeof Commands>;
@@ -17,6 +18,7 @@ export type Command = ValueOf<typeof Commands>;
 export const commandIndex: Record<Command, number> = {
   [Commands.NOTE_OFF]: 128,
   [Commands.NOTE_ON]: 144,
+  [Commands.CONTROL_CHANGE]: 176,
   [Commands.PITCH_BEND]: 224,
 } as const;
 
@@ -53,6 +55,22 @@ export const commandTable: Record<string, Command> = {
   157: Commands.NOTE_ON,
   158: Commands.NOTE_ON,
   159: Commands.NOTE_ON,
+  176: Commands.CONTROL_CHANGE,
+  177: Commands.CONTROL_CHANGE,
+  178: Commands.CONTROL_CHANGE,
+  179: Commands.CONTROL_CHANGE,
+  180: Commands.CONTROL_CHANGE,
+  181: Commands.CONTROL_CHANGE,
+  182: Commands.CONTROL_CHANGE,
+  183: Commands.CONTROL_CHANGE,
+  184: Commands.CONTROL_CHANGE,
+  185: Commands.CONTROL_CHANGE,
+  186: Commands.CONTROL_CHANGE,
+  187: Commands.CONTROL_CHANGE,
+  188: Commands.CONTROL_CHANGE,
+  189: Commands.CONTROL_CHANGE,
+  190: Commands.CONTROL_CHANGE,
+  191: Commands.CONTROL_CHANGE,
   224: Commands.PITCH_BEND,
   225: Commands.PITCH_BEND,
   226: Commands.PITCH_BEND,

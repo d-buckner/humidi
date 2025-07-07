@@ -1,4 +1,3 @@
-import path from 'path';
 import { defineConfig } from 'vite';
 import dts from 'vite-plugin-dts';
 import terser from '@rollup/plugin-terser';
@@ -11,6 +10,7 @@ export default defineConfig({
     }),
   ],
   build: {
+    minify: 'terser',
     rollupOptions: {
       plugins: terser()
     },

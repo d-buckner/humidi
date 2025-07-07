@@ -211,6 +211,107 @@ describe('HuMIDI', () => {
         return (val - 8192) / 8192;
       }
     });
+
+    describe('sustain events', () => {
+      it('should trigger sustainon event when control value is 64 or greater', () => {
+        const handler = vi.fn();
+        HuMIDI.on('sustainon', handler, 0);
+
+        dispatchMidi(176, 64, 127);
+
+        expect(handler).toHaveBeenCalledWith({
+          value: 127,
+        });
+      });
+
+      it('should trigger sustainoff event when control value is less than 64', () => {
+        const handler = vi.fn();
+        HuMIDI.on('sustainoff', handler, 0);
+
+        dispatchMidi(176, 64, 0);
+
+        expect(handler).toHaveBeenCalledWith({
+          value: 0,
+        });
+      });
+
+      it('should handle sustain on boundary condition (value = 64)', () => {
+        const onHandler = vi.fn();
+        const offHandler = vi.fn();
+        HuMIDI.on('sustainon', onHandler, 0);
+        HuMIDI.on('sustainoff', offHandler, 0);
+
+        dispatchMidi(176, 64, 64);
+
+        expect(onHandler).toHaveBeenCalledWith({ value: 64 });
+        expect(offHandler).not.toHaveBeenCalled();
+      });
+
+      it('should handle sustain off boundary condition (value = 63)', () => {
+        const onHandler = vi.fn();
+        const offHandler = vi.fn();
+        HuMIDI.on('sustainon', onHandler, 0);
+        HuMIDI.on('sustainoff', offHandler, 0);
+
+        dispatchMidi(176, 64, 63);
+
+        expect(offHandler).toHaveBeenCalledWith({ value: 63 });
+        expect(onHandler).not.toHaveBeenCalled();
+      });
+
+      it('should handle sustain events on different channels', () => {
+        const channel0Handler = vi.fn();
+        const channel1Handler = vi.fn();
+        const allChannelsHandler = vi.fn();
+
+        HuMIDI.on('sustainon', channel0Handler, 0);
+        HuMIDI.on('sustainon', channel1Handler, 1);
+        HuMIDI.on('sustainon', allChannelsHandler);
+
+        dispatchMidi(176, 64, 127);
+        dispatchMidi(177, 64, 100);
+
+        expect(channel0Handler).toHaveBeenCalledWith({ value: 127 });
+        expect(channel1Handler).toHaveBeenCalledWith({ value: 100 });
+        expect(allChannelsHandler).toHaveBeenCalledTimes(2);
+      });
+
+      it('should remove sustain event handlers with off method', () => {
+        const onHandler = vi.fn();
+        const offHandler = vi.fn();
+
+        HuMIDI.on('sustainon', onHandler, 0);
+        HuMIDI.on('sustainoff', offHandler, 0);
+        HuMIDI.off('sustainon', onHandler, 0);
+        HuMIDI.off('sustainoff', offHandler, 0);
+
+        dispatchMidi(176, 64, 127);
+        dispatchMidi(176, 64, 0);
+
+        expect(onHandler).not.toHaveBeenCalled();
+        expect(offHandler).not.toHaveBeenCalled();
+      });
+
+      it('should handle multiple sustain state changes', () => {
+        const onHandler = vi.fn();
+        const offHandler = vi.fn();
+
+        HuMIDI.on('sustainon', onHandler);
+        HuMIDI.on('sustainoff', offHandler);
+
+        dispatchMidi(176, 64, 127);
+        dispatchMidi(176, 64, 0);
+        dispatchMidi(176, 64, 100);
+        dispatchMidi(176, 64, 50);
+
+        expect(onHandler).toHaveBeenCalledTimes(2);
+        expect(offHandler).toHaveBeenCalledTimes(2);
+        expect(onHandler).toHaveBeenNthCalledWith(1, { value: 127 });
+        expect(offHandler).toHaveBeenNthCalledWith(1, { value: 0 });
+        expect(onHandler).toHaveBeenNthCalledWith(2, { value: 100 });
+        expect(offHandler).toHaveBeenNthCalledWith(2, { value: 50 });
+      });
+    });
   })
 });
 

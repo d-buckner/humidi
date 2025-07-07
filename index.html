@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HuMIDI Demo - Test with Your Piano</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .status {
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+        
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status.pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+        
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .events-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .event-box {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            min-height: 200px;
+        }
+        
+        .event-box h3 {
+            margin-top: 0;
+            color: #555;
+        }
+        
+        .event-log {
+            background: #f8f9fa;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 14px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        
+        .event-item {
+            padding: 4px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .event-item:last-child {
+            border-bottom: none;
+        }
+        
+        .keyboard-visual {
+            display: flex;
+            gap: 2px;
+            margin-top: 20px;
+            height: 100px;
+            overflow-x: auto;
+            padding: 10px;
+            background: #333;
+            border-radius: 4px;
+        }
+        
+        .key {
+            width: 20px;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 0 0 4px 4px;
+            transition: all 0.1s;
+            position: relative;
+        }
+        
+        .key.black {
+            background: #222;
+            height: 60%;
+            width: 16px;
+            margin: 0 -8px;
+            z-index: 1;
+        }
+        
+        .key.active {
+            background: #4CAF50;
+            transform: translateY(2px);
+        }
+        
+        .key.black.active {
+            background: #81C784;
+        }
+        
+        .pitch-bend-visual {
+            width: 100%;
+            height: 40px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            position: relative;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        
+        .pitch-bend-indicator {
+            width: 4px;
+            height: 100%;
+            background: #2196F3;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            transition: left 0.05s;
+        }
+        
+        .sustain-indicator {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #ccc;
+            margin-left: 10px;
+            transition: all 0.2s;
+        }
+        
+        .sustain-indicator.active {
+            background: #4CAF50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+        
+        .instructions {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-top: 20px;
+        }
+        
+        .instructions h4 {
+            margin-top: 0;
+            color: #1976D2;
+        }
+        
+        .channel-selector {
+            margin: 20px 0;
+        }
+        
+        .channel-selector label {
+            font-weight: 500;
+            margin-right: 10px;
+        }
+        
+        .channel-selector select {
+            padding: 5px 10px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>HuMIDI Demo</h1>
+        <p>Test the HuMIDI library with your MIDI keyboard or piano</p>
+        
+        <div id="status" class="status disconnected">
+            MIDI not connected
+        </div>
+        
+        <button id="connectBtn" onclick="connectMIDI()">Connect MIDI Device</button>
+        
+        <div class="channel-selector">
+            <label for="channelSelect">Listen to channel:</label>
+            <select id="channelSelect" onchange="changeChannel()">
+                <option value="-1">All channels</option>
+                <option value="0">Channel 1</option>
+                <option value="1">Channel 2</option>
+                <option value="2">Channel 3</option>
+                <option value="3">Channel 4</option>
+                <option value="4">Channel 5</option>
+                <option value="5">Channel 6</option>
+                <option value="6">Channel 7</option>
+                <option value="7">Channel 8</option>
+                <option value="8">Channel 9</option>
+                <option value="9">Channel 10</option>
+                <option value="10">Channel 11</option>
+                <option value="11">Channel 12</option>
+                <option value="12">Channel 13</option>
+                <option value="13">Channel 14</option>
+                <option value="14">Channel 15</option>
+                <option value="15">Channel 16</option>
+            </select>
+        </div>
+        
+        <div class="keyboard-visual" id="keyboard"></div>
+        
+        <div class="events-container">
+            <div class="event-box">
+                <h3>Note Events</h3>
+                <div class="event-log" id="noteLog"></div>
+            </div>
+            
+            <div class="event-box">
+                <h3>Pitch Bend</h3>
+                <div class="pitch-bend-visual">
+                    <div class="pitch-bend-indicator" id="pitchBendIndicator"></div>
+                </div>
+                <div class="event-log" id="pitchBendLog"></div>
+            </div>
+            
+            <div class="event-box">
+                <h3>Sustain Pedal <span class="sustain-indicator" id="sustainIndicator"></span></h3>
+                <div class="event-log" id="sustainLog"></div>
+            </div>
+        </div>
+        
+        <div class="instructions">
+            <h4>Instructions:</h4>
+            <ul>
+                <li>Click "Connect MIDI Device" to start</li>
+                <li>Select your MIDI device when prompted by the browser</li>
+                <li>Play notes on your keyboard to see them visualized</li>
+                <li>Use the pitch bend wheel to see the indicator move</li>
+                <li>Press the sustain pedal to see it light up</li>
+                <li>All MIDI events are logged in real-time</li>
+            </ul>
+            <p><strong>Browser Support:</strong> This demo requires a browser with Web MIDI API support (Chrome, Edge, Opera)</p>
+        </div>
+    </div>
+    
+    <script type="module">
+        import HuMIDI from './dist/index.js';
+        
+        window.HuMIDI = HuMIDI;
+        
+        const activeNotes = new Set();
+        let currentChannel = -1;
+        
+        // Store event handlers for cleanup
+        const eventHandlers = {
+            noteon: null,
+            noteoff: null,
+            pitchbend: null,
+            sustainon: null,
+            sustainoff: null
+        };
+        
+        // Create visual keyboard
+        function createKeyboard() {
+            const keyboard = document.getElementById('keyboard');
+            const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            
+            // Create keys for 5 octaves (C3 to C8)
+            for (let octave = 3; octave < 8; octave++) {
+                for (let note = 0; note < 12; note++) {
+                    const midiNote = (octave * 12) + note;
+                    const key = document.createElement('div');
+                    key.className = noteNames[note].includes('#') ? 'key black' : 'key';
+                    key.id = `key-${midiNote}`;
+                    keyboard.appendChild(key);
+                }
+            }
+        }
+        
+        // Add event to log with timestamp
+        function addToLog(logId, message) {
+            const log = document.getElementById(logId);
+            const time = new Date().toLocaleTimeString();
+            const item = document.createElement('div');
+            item.className = 'event-item';
+            item.textContent = `${time} - ${message}`;
+            log.insertBefore(item, log.firstChild);
+            
+            // Keep only last 10 events
+            while (log.children.length > 10) {
+                log.removeChild(log.lastChild);
+            }
+        }
+        
+        // Note name helper
+        function getNoteName(midiNote) {
+            const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            const octave = Math.floor(midiNote / 12) - 1;
+            const noteName = noteNames[midiNote % 12];
+            return `${noteName}${octave}`;
+        }
+        
+        // Setup event handlers
+        function setupEventHandlers() {
+            // Remove old handlers first
+            HuMIDI.off('noteon', eventHandlers.noteon, currentChannel);
+            HuMIDI.off('noteoff', eventHandlers.noteoff, currentChannel);
+            HuMIDI.off('pitchbend', eventHandlers.pitchbend, currentChannel);
+            HuMIDI.off('sustainon', eventHandlers.sustainon, currentChannel);
+            HuMIDI.off('sustainoff', eventHandlers.sustainoff, currentChannel);
+            
+            // Get new channel selection
+            currentChannel = parseInt(document.getElementById('channelSelect').value);
+            const channelParam = currentChannel >= 0 ? currentChannel : undefined;
+            
+            // Note On
+            eventHandlers.noteon = (event) => {
+                const noteName = getNoteName(event.note);
+                addToLog('noteLog', `Note ON: ${noteName} (${event.note}) - Velocity: ${event.velocity}`);
+                
+                activeNotes.add(event.note);
+                const key = document.getElementById(`key-${event.note}`);
+                if (key) key.classList.add('active');
+            };
+            HuMIDI.on('noteon', eventHandlers.noteon, channelParam);
+            
+            // Note Off
+            eventHandlers.noteoff = (event) => {
+                const noteName = getNoteName(event.note);
+                addToLog('noteLog', `Note OFF: ${noteName} (${event.note})`);
+                
+                activeNotes.delete(event.note);
+                const key = document.getElementById(`key-${event.note}`);
+                if (key) key.classList.remove('active');
+            };
+            HuMIDI.on('noteoff', eventHandlers.noteoff, channelParam);
+            
+            // Pitch Bend
+            eventHandlers.pitchbend = (event) => {
+                const percentage = ((event.value + 1) / 2 * 100).toFixed(1);
+                addToLog('pitchBendLog', `Pitch bend: ${event.value.toFixed(3)} (${percentage}%)`);
+                
+                const indicator = document.getElementById('pitchBendIndicator');
+                indicator.style.left = `${percentage}%`;
+            };
+            HuMIDI.on('pitchbend', eventHandlers.pitchbend, channelParam);
+            
+            // Sustain On
+            eventHandlers.sustainon = (event) => {
+                addToLog('sustainLog', `Sustain ON - Value: ${event.value}`);
+                document.getElementById('sustainIndicator').classList.add('active');
+            };
+            HuMIDI.on('sustainon', eventHandlers.sustainon, channelParam);
+            
+            // Sustain Off
+            eventHandlers.sustainoff = (event) => {
+                addToLog('sustainLog', `Sustain OFF - Value: ${event.value}`);
+                document.getElementById('sustainIndicator').classList.remove('active');
+            };
+            HuMIDI.on('sustainoff', eventHandlers.sustainoff, channelParam);
+        }
+        
+        // Connect MIDI
+        window.connectMIDI = async function() {
+            const statusEl = document.getElementById('status');
+            const connectBtn = document.getElementById('connectBtn');
+            
+            try {
+                statusEl.textContent = 'Requesting MIDI access...';
+                statusEl.className = 'status pending';
+                connectBtn.disabled = true;
+                
+                await HuMIDI.requestAccess();
+                
+                statusEl.textContent = 'MIDI connected successfully!';
+                statusEl.className = 'status connected';
+                connectBtn.textContent = 'Connected';
+                
+                setupEventHandlers();
+                
+            } catch (error) {
+                statusEl.textContent = `Error: ${error.message}`;
+                statusEl.className = 'status disconnected';
+                connectBtn.disabled = false;
+            }
+        };
+        
+        // Change channel
+        window.changeChannel = function() {
+            if (HuMIDI.getAccessStatus() === 'accepted') {
+                setupEventHandlers();
+                const channel = document.getElementById('channelSelect').value;
+                const channelName = channel === '-1' ? 'all channels' : `channel ${parseInt(channel) + 1}`;
+                addToLog('noteLog', `Switched to ${channelName}`);
+            }
+        };
+        
+        // Initialize keyboard on load
+        createKeyboard();
+    </script>
+</body>
+</html>

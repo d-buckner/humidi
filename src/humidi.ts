@@ -1,10 +1,15 @@
 import {
-  type Command,
   Commands,
   commandTable,
   commandIndex,
 } from './commands';
+import {
+  ControlCommands,
+  controlCommandTable,
+  ControllerCommands,
+} from './controlCommands';
 
+import type { Command } from './commands';
 import type { ValueOf } from './utils';
 
 
@@ -12,6 +17,8 @@ const Event = {
   NOTE_ON: Commands.NOTE_ON,
   NOTE_OFF: Commands.NOTE_OFF,
   PITCH_BEND: Commands.PITCH_BEND,
+  SUSTAIN_ON: ControllerCommands.SUSTAIN_ON,
+  SUSTAIN_OFF: ControllerCommands.SUSTAIN_OFF,
 } as const;
 
 export type NoteOnEvent = {
@@ -23,9 +30,12 @@ export type NoteOffEvent = {
   note: number,
 };
 
-export type PitchBendEvent = {
+type ValueEvent = {
   value: number,
 };
+
+export type PitchBendEvent = ValueEvent;
+export type SustainEvent = ValueEvent;
 
 export const AccessStatus = {
   UNREQUESTED: 'unrequested',
@@ -51,6 +61,7 @@ export default class HuMIDI {
     [Commands.NOTE_ON]: HuMIDI.onNoteOn,
     [Commands.NOTE_OFF]: HuMIDI.onNoteOff,
     [Commands.PITCH_BEND]: HuMIDI.onPitchBend,
+    [Commands.CONTROL_CHANGE]: HuMIDI.onControlChange,
   };
 
   static async requestAccess() {
@@ -164,5 +175,24 @@ export default class HuMIDI {
       { value: (rawValue - 8192) / 8192 },
       channel,
     );
+  }
+
+  private static onControlChange(channel: number, control: number, value:  number) {
+    const controlCommand = controlCommandTable[control];
+
+    switch (controlCommand) {
+      case ControlCommands.SUSTAIN:
+        const eventType = value >= 64
+          ? Event.SUSTAIN_ON
+          : Event.SUSTAIN_OFF;
+        HuMIDI.emit<SustainEvent>(
+          eventType,
+          { value },
+          channel,
+        );
+        break;
+      default:
+        break
+    }
   }
 }

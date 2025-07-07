@@ -4,4 +4,5 @@ export type {
   NoteOnEvent,
   NoteOffEvent,
   PitchBendEvent,
+  SustainEvent,
 } from './humidi';
