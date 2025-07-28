@@ -38,6 +38,9 @@ jobs:
       - name: Run tests
         run: npm test
         
+      - name: Build library
+        run: npm run build
+        
       - name: Generate documentation
         run: npm run docs
         
