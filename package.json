@@ -18,6 +18,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "test": "vitest",
+    "docs": "typedoc",
+    "docs:serve": "typedoc && npx http-server docs -p 8080",
     "release": "npm run build && npm publish"
   },
   "devDependencies": {
@@ -26,6 +28,7 @@
     "@types/webmidi": "^2.1.0",
     "@vitest/coverage-istanbul": "^3.2.4",
     "happy-dom": "^18.0.1",
+    "typedoc": "^0.28.8",
     "typescript": "~5.8.3",
     "vite": "^6.3.5",
     "vite-plugin-dts": "^4.5.4"

@@ -4,6 +4,20 @@ Simple and lightweight MIDI library for humans. Zero dependencies, less than 5kB
 
 Currently handles simple use cases for note event.
 
+## 🎹 Live Demo
+
+Try HuMIDI with your MIDI keyboard: **https://d-buckner.github.io/humidi/**
+
+## 📖 Documentation
+
+Full API documentation is available at: **https://d-buckner.github.io/humidi/docs/**
+
+The documentation is automatically generated from TypeScript definitions and includes:
+- Complete API reference
+- Type definitions  
+- Usage examples
+- Device management guides
+
 ```typescript
 import HuMIDI, {
   type NoteOnEvent,

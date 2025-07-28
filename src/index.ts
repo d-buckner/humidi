@@ -5,4 +5,8 @@ export type {
   NoteOffEvent,
   PitchBendEvent,
   SustainEvent,
+  MIDIInputInfo,
+  InputEvent,
 } from './humidi';
+
+export { MIDIInput } from './humidi';

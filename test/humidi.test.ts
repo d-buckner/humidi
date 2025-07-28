@@ -19,8 +19,30 @@ const mockMIDIInput = {
   onmidimessage: null as any,
 };
 
+const mockMIDIInput2 = {
+  onmidimessage: null as any,
+  id: 'input2',
+  name: 'Test Input 2',
+  manufacturer: 'Test Manufacturer',
+  type: 'input',
+  state: 'connected',
+};
+
+const mockMIDIOutput = {
+  id: 'output1',
+  name: 'Test Output',
+  manufacturer: 'Test Manufacturer',
+  type: 'output',
+  state: 'connected',
+};
+
 const mockMIDIAccess = {
-  inputs: new Map([['input1', mockMIDIInput]]),
+  inputs: new Map([
+    ['input1', { ...mockMIDIInput, id: 'input1', name: 'Test Input 1', manufacturer: 'Test Manufacturer', type: 'input', state: 'connected' }],
+    ['input2', mockMIDIInput2]
+  ]),
+  outputs: new Map([['output1', mockMIDIOutput]]),
+  onstatechange: null as any,
 };
 
 
@@ -38,6 +60,15 @@ const testCases: PitchBendTestCase[] = [
 describe('HuMIDI', () => {
   beforeEach(() => {
     navigator.requestMIDIAccess = vi.fn();
+    if (!navigator.permissions) {
+      Object.defineProperty(navigator, 'permissions', {
+        value: { query: vi.fn() },
+        writable: true,
+        configurable: true,
+      });
+    } else {
+      vi.spyOn(navigator.permissions, 'query');
+    }
     HuMIDI.reset();
     vi.clearAllMocks();
     mockMIDIInput.onmidimessage = null;
@@ -51,7 +82,8 @@ describe('HuMIDI', () => {
 
       expect(navigator.requestMIDIAccess).toHaveBeenCalled();
       expect(HuMIDI.getAccessStatus()).toBe(AccessStatus.ACCEPTED);
-      expect(mockMIDIInput.onmidimessage).not.toBeNull();
+      const input1 = mockMIDIAccess.inputs.get('input1') as any;
+      expect(input1.onmidimessage).not.toBeNull();
     });
 
     it('should handle MIDI access denial', async () => {
@@ -312,11 +344,581 @@ describe('HuMIDI', () => {
         expect(offHandler).toHaveBeenNthCalledWith(2, { value: 50 });
       });
     });
-  })
+
+    describe('enabled/disabled state', () => {
+      beforeEach(async () => {
+        (navigator.requestMIDIAccess as any).mockResolvedValue(mockMIDIAccess);
+        await HuMIDI.requestAccess();
+      });
+
+      it('should not trigger events when disabled', () => {
+        const handler = vi.fn();
+        HuMIDI.on('noteon', handler, 0);
+        
+        HuMIDI.setEnabled(false);
+        dispatchMidi(144, 60, 100);
+        
+        expect(handler).not.toHaveBeenCalled();
+      });
+
+      it('should trigger events when re-enabled', () => {
+        const handler = vi.fn();
+        HuMIDI.on('noteon', handler, 0);
+        
+        HuMIDI.setEnabled(false);
+        HuMIDI.setEnabled(true);
+        dispatchMidi(144, 60, 100);
+        
+        expect(handler).toHaveBeenCalled();
+      });
+
+      it('should return current enabled state', () => {
+        expect(HuMIDI.isEnabled()).toBe(true);
+        
+        HuMIDI.setEnabled(false);
+        expect(HuMIDI.isEnabled()).toBe(false);
+        
+        HuMIDI.setEnabled(true);
+        expect(HuMIDI.isEnabled()).toBe(true);
+      });
+    });
+  });
+
+  describe('hasPermissions', () => {
+    it('should return true when permissions are granted', async () => {
+      (navigator.permissions.query as any).mockResolvedValue({ state: 'granted' });
+      
+      const result = await HuMIDI.hasPermissions();
+      
+      expect(result).toBe(true);
+      expect(navigator.permissions.query).toHaveBeenCalledWith({ name: 'midi' });
+    });
+
+    it('should return false when permissions are denied', async () => {
+      (navigator.permissions.query as any).mockResolvedValue({ state: 'denied' });
+      
+      const result = await HuMIDI.hasPermissions();
+      
+      expect(result).toBe(false);
+    });
+
+    it('should return false when permissions are prompt', async () => {
+      (navigator.permissions.query as any).mockResolvedValue({ state: 'prompt' });
+      
+      const result = await HuMIDI.hasPermissions();
+      
+      expect(result).toBe(false);
+    });
+
+    it('should return false when permissions API is not supported', async () => {
+      Object.defineProperty(navigator, 'permissions', {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      });
+      
+      const result = await HuMIDI.hasPermissions();
+      
+      expect(result).toBe(false);
+    });
+
+    it('should return false when query throws an error', async () => {
+      (navigator.permissions.query as any).mockRejectedValue(new Error('Not supported'));
+      
+      const result = await HuMIDI.hasPermissions();
+      
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('device hot-plugging', () => {
+    beforeEach(async () => {
+      (navigator.requestMIDIAccess as any).mockResolvedValue(mockMIDIAccess);
+      await HuMIDI.requestAccess();
+    });
+
+    it('should setup statechange handler on access', () => {
+      expect(mockMIDIAccess.onstatechange).not.toBeNull();
+    });
+
+    it('should setup message handler for newly connected input devices', () => {
+      const newInput = { onmidimessage: null as any };
+      const connectionEvent = {
+        port: {
+          type: 'input',
+          state: 'connected',
+          onmidimessage: null as any,
+        }
+      };
+
+      mockMIDIAccess.onstatechange(connectionEvent);
+
+      expect(connectionEvent.port.onmidimessage).not.toBeNull();
+    });
+
+    it('should not setup handler for output devices', () => {
+      const connectionEvent = {
+        port: {
+          type: 'output',
+          state: 'connected',
+          onmidimessage: null as any,
+        }
+      };
+
+      mockMIDIAccess.onstatechange(connectionEvent);
+
+      expect(connectionEvent.port.onmidimessage).toBeNull();
+    });
+
+    it('should not setup handler for disconnected devices', () => {
+      const connectionEvent = {
+        port: {
+          type: 'input',
+          state: 'disconnected',
+          onmidimessage: null as any,
+        }
+      };
+
+      mockMIDIAccess.onstatechange(connectionEvent);
+
+      expect(connectionEvent.port.onmidimessage).toBeNull();
+    });
+
+    it('should handle messages from hot-plugged devices', () => {
+      const handler = vi.fn();
+      HuMIDI.on('noteon', handler, 0);
+
+      const newInput = { onmidimessage: null as any };
+      const connectionEvent = {
+        port: {
+          type: 'input',
+          state: 'connected',
+          onmidimessage: null as any,
+        }
+      };
+
+      mockMIDIAccess.onstatechange(connectionEvent);
+
+      connectionEvent.port.onmidimessage({
+        data: new Uint8Array([144, 60, 100])
+      });
+
+      expect(handler).toHaveBeenCalledWith({
+        note: 60,
+        velocity: 100,
+      });
+    });
+  });
+
+  describe('input management', () => {
+    beforeEach(async () => {
+      (navigator.requestMIDIAccess as any).mockResolvedValue(mockMIDIAccess);
+      await HuMIDI.requestAccess();
+    });
+
+    describe('getInputs', () => {
+      it('should return empty array when no access', () => {
+        HuMIDI.reset();
+        const inputs = HuMIDI.getInputs();
+        expect(inputs).toEqual([]);
+      });
+
+      it('should return list of input devices only', () => {
+        const inputs = HuMIDI.getInputs();
+        
+        expect(inputs).toHaveLength(2); // Only inputs, no outputs
+        
+        const input1 = inputs.find(i => i.id === 'input1');
+        const input2 = inputs.find(i => i.id === 'input2');
+        
+        expect(input1?.name).toBe('Test Input 1');
+        expect(input1?.manufacturer).toBe('Test Manufacturer');
+        expect(input1?.state).toBe('connected');
+        
+        expect(input2?.name).toBe('Test Input 2');
+        expect(input2?.manufacturer).toBe('Test Manufacturer');
+        expect(input2?.state).toBe('connected');
+      });
+
+      it('should allow enabling and disabling inputs', () => {
+        const inputs = HuMIDI.getInputs();
+        const input1 = inputs.find(i => i.id === 'input1');
+        
+        expect(input1?.isEnabled()).toBe(true);
+        
+        input1?.disable();
+        expect(input1?.isEnabled()).toBe(false);
+        
+        input1?.enable();
+        expect(input1?.isEnabled()).toBe(true);
+      });
+    });
+
+    describe('input connection events', () => {
+      it('should emit input connected event when input device connects', () => {
+        const inputHandler = vi.fn();
+        HuMIDI.on('inputconnected', inputHandler);
+
+        const connectionEvent = {
+          port: {
+            id: 'newinput',
+            name: 'New Input Device',
+            manufacturer: 'New Manufacturer',
+            type: 'input',
+            state: 'connected',
+            onmidimessage: null as any,
+          }
+        };
+
+        mockMIDIAccess.onstatechange(connectionEvent);
+
+        expect(inputHandler).toHaveBeenCalled();
+        const call = inputHandler.mock.calls[inputHandler.mock.calls.length - 1][0];
+        expect(call.input.id).toBe('newinput');
+        expect(call.input.name).toBe('New Input Device');
+        expect(call.input.manufacturer).toBe('New Manufacturer');
+        expect(call.input.state).toBe('connected');
+      });
+
+      it('should not emit events for output device connections', () => {
+        const inputHandler = vi.fn();
+        HuMIDI.on('inputconnected', inputHandler);
+
+        const connectionEvent = {
+          port: {
+            id: 'newoutput',
+            name: 'New Output Device',
+            manufacturer: 'New Manufacturer',
+            type: 'output',
+            state: 'connected',
+          }
+        };
+
+        mockMIDIAccess.onstatechange(connectionEvent);
+
+        expect(inputHandler).not.toHaveBeenCalled();
+      });
+
+      it('should emit input disconnected event', () => {
+        const inputHandler = vi.fn();
+        HuMIDI.on('inputdisconnected', inputHandler);
+
+        const disconnectionEvent = {
+          port: {
+            id: 'disconnectedinput',
+            name: 'Disconnected Device',
+            manufacturer: 'Test Manufacturer',
+            type: 'input',
+            state: 'disconnected',
+          }
+        };
+
+        mockMIDIAccess.onstatechange(disconnectionEvent);
+
+        expect(inputHandler).toHaveBeenCalledTimes(1);
+        const call = inputHandler.mock.calls[0][0];
+        expect(call.input.id).toBe('disconnectedinput');
+        expect(call.input.name).toBe('Disconnected Device');
+        expect(call.input.manufacturer).toBe('Test Manufacturer');
+        expect(call.input.state).toBe('disconnected');
+      });
+
+      it('should handle inputs with missing properties', () => {
+        const inputHandler = vi.fn();
+        HuMIDI.on('inputconnected', inputHandler);
+
+        const connectionEvent = {
+          port: {
+            id: '',
+            name: '',
+            manufacturer: '',
+            type: 'input',
+            state: 'connected',
+            onmidimessage: null as any,
+          }
+        };
+
+        mockMIDIAccess.onstatechange(connectionEvent);
+
+        expect(inputHandler).toHaveBeenCalledTimes(1);
+        const call = inputHandler.mock.calls[0][0];
+        expect(call.input.id).toBe('unknown');
+        expect(call.input.name).toBe('Unknown Device');
+        expect(call.input.manufacturer).toBe('Unknown');
+        expect(call.input.state).toBe('connected');
+      });
+
+      it('should setup message handler for connected input devices but not outputs', () => {
+        const inputEvent = {
+          port: {
+            id: 'newinput',
+            name: 'New Input',
+            manufacturer: 'Test',
+            type: 'input',
+            state: 'connected',
+            onmidimessage: null as any,
+          }
+        };
+
+        const outputEvent = {
+          port: {
+            id: 'newoutput',
+            name: 'New Output',
+            manufacturer: 'Test',
+            type: 'output',
+            state: 'connected',
+          }
+        };
+
+        mockMIDIAccess.onstatechange(inputEvent);
+        mockMIDIAccess.onstatechange(outputEvent);
+
+        expect(inputEvent.port.onmidimessage).not.toBeNull();
+        expect(outputEvent.port.onmidimessage).toBeUndefined();
+      });
+
+      it('should filter messages from disabled inputs', () => {
+        const noteHandler = vi.fn();
+        HuMIDI.on('noteon', noteHandler);
+
+        const inputs = HuMIDI.getInputs();
+        const input1 = inputs.find(i => i.id === 'input1');
+        
+        // Disable the input
+        input1?.disable();
+
+        // Try to send a MIDI message
+        dispatchMidi(144, 60, 100);
+
+        // Message should be filtered out
+        expect(noteHandler).not.toHaveBeenCalled();
+
+        // Re-enable and try again
+        input1?.enable();
+        dispatchMidi(144, 60, 100);
+
+        // Now it should work
+        expect(noteHandler).toHaveBeenCalledWith({
+          note: 60,
+          velocity: 100,
+        });
+      });
+    });
+
+    describe('per-device note tracking', () => {
+      it('should track notes separately for different devices', () => {
+        const noteOffHandler = vi.fn();
+        HuMIDI.on('noteoff', noteOffHandler);
+
+        // Device 1 plays note 60
+        const input1 = (mockMIDIAccess.inputs.get('input1') as any);
+        input1.onmidimessage({
+          data: new Uint8Array([144, 60, 100]) // Note on
+        });
+
+        // Device 2 plays the same note 60
+        const input2 = (mockMIDIAccess.inputs.get('input2') as any);
+        input2.onmidimessage({
+          data: new Uint8Array([144, 60, 100]) // Note on
+        });
+
+        // Simulate device 1 disconnection
+        const disconnectionEvent = {
+          port: {
+            id: 'input1',
+            name: 'Test Input 1',
+            manufacturer: 'Test Manufacturer',
+            type: 'input',
+            state: 'disconnected',
+          }
+        };
+
+        mockMIDIAccess.onstatechange(disconnectionEvent);
+
+        // Should only send note off for device 1's note, not device 2's
+        expect(noteOffHandler).toHaveBeenCalledTimes(1);
+        expect(noteOffHandler).toHaveBeenCalledWith({ note: 60 });
+      });
+
+      it('should handle multiple notes on same channel from different devices', () => {
+        const noteOffHandler = vi.fn();
+        HuMIDI.on('noteoff', noteOffHandler);
+
+        // Device 1 plays notes 60 and 64 on channel 0
+        const input1 = (mockMIDIAccess.inputs.get('input1') as any);
+        input1.onmidimessage({
+          data: new Uint8Array([144, 60, 100]) // Note on
+        });
+        input1.onmidimessage({
+          data: new Uint8Array([144, 64, 100]) // Note on
+        });
+
+        // Device 2 plays notes 62 and 67 on same channel 0
+        const input2 = (mockMIDIAccess.inputs.get('input2') as any);
+        input2.onmidimessage({
+          data: new Uint8Array([144, 62, 100]) // Note on
+        });
+        input2.onmidimessage({
+          data: new Uint8Array([144, 67, 100]) // Note on
+        });
+
+        // Simulate device 1 disconnection
+        const disconnectionEvent = {
+          port: {
+            id: 'input1',
+            name: 'Test Input 1',
+            manufacturer: 'Test Manufacturer',
+            type: 'input',
+            state: 'disconnected',
+          }
+        };
+
+        mockMIDIAccess.onstatechange(disconnectionEvent);
+
+        // Should send note off for device 1's notes (60, 64) but not device 2's (62, 67)
+        expect(noteOffHandler).toHaveBeenCalledTimes(2);
+        
+        const calls = noteOffHandler.mock.calls.map(call => call[0].note).sort();
+        expect(calls).toEqual([60, 64]);
+      });
+
+      it('should handle notes on different channels from same device', () => {
+        const noteOffHandler = vi.fn();
+        HuMIDI.on('noteoff', noteOffHandler);
+
+        // Device 1 plays note 60 on channel 0 and note 64 on channel 1
+        const input1 = (mockMIDIAccess.inputs.get('input1') as any);
+        input1.onmidimessage({
+          data: new Uint8Array([144, 60, 100]) // Channel 0, Note on
+        });
+        input1.onmidimessage({
+          data: new Uint8Array([145, 64, 100]) // Channel 1, Note on
+        });
+
+        // Simulate device 1 disconnection
+        const disconnectionEvent = {
+          port: {
+            id: 'input1',
+            name: 'Test Input 1',
+            manufacturer: 'Test Manufacturer',
+            type: 'input',
+            state: 'disconnected',
+          }
+        };
+
+        mockMIDIAccess.onstatechange(disconnectionEvent);
+
+        // Should send note off for both notes from device 1
+        expect(noteOffHandler).toHaveBeenCalledTimes(2);
+        
+        const calls = noteOffHandler.mock.calls.map(call => call[0].note).sort();
+        expect(calls).toEqual([60, 64]);
+      });
+
+      it('should not send note off events if device has no active notes', () => {
+        const noteOffHandler = vi.fn();
+        HuMIDI.on('noteoff', noteOffHandler);
+
+        // No notes played on any device
+
+        // Simulate device 1 disconnection
+        const disconnectionEvent = {
+          port: {
+            id: 'input1',
+            name: 'Test Input 1',
+            manufacturer: 'Test Manufacturer',
+            type: 'input',
+            state: 'disconnected',
+          }
+        };
+
+        mockMIDIAccess.onstatechange(disconnectionEvent);
+
+        // Should not send any note off events
+        expect(noteOffHandler).not.toHaveBeenCalled();
+      });
+
+      it('should properly clean up device note tracking after disconnect', () => {
+        const noteOffHandler = vi.fn();
+        HuMIDI.on('noteoff', noteOffHandler);
+
+        // Device 1 plays a note
+        const input1 = (mockMIDIAccess.inputs.get('input1') as any);
+        input1.onmidimessage({
+          data: new Uint8Array([144, 60, 100]) // Note on
+        });
+
+        // Simulate device 1 disconnection
+        const disconnectionEvent = {
+          port: {
+            id: 'input1',
+            name: 'Test Input 1',
+            manufacturer: 'Test Manufacturer',
+            type: 'input',
+            state: 'disconnected',
+          }
+        };
+
+        mockMIDIAccess.onstatechange(disconnectionEvent);
+
+        // Clear the handler calls
+        noteOffHandler.mockClear();
+
+        // Simulate the same device disconnecting again
+        mockMIDIAccess.onstatechange(disconnectionEvent);
+
+        // Should not send any additional note off events since device tracking was cleaned up
+        expect(noteOffHandler).not.toHaveBeenCalled();
+      });
+
+      it('should handle note off events properly with per-device tracking', () => {
+        // Test that shows a note was played and released normally, so disconnect shouldn't trigger cleanup
+        const noteOffHandler = vi.fn();
+        HuMIDI.on('noteoff', noteOffHandler);
+
+        // Play and release note on input1 (should track properly)
+        const input1 = (mockMIDIAccess.inputs.get('input1') as any);
+        
+        // Note on
+        input1.onmidimessage({
+          data: new Uint8Array([144, 60, 100])
+        });
+        
+        // Note off
+        input1.onmidimessage({
+          data: new Uint8Array([128, 60, 0])
+        });
+        
+        // Should have called note off once for normal release
+        expect(noteOffHandler).toHaveBeenCalledTimes(1);
+        noteOffHandler.mockClear();
+
+        // Now disconnect input1 - should NOT trigger stuck note cleanup
+        const event = {
+          port: {
+            id: 'input1',
+            type: 'input',
+            state: 'disconnected',
+            name: 'Test Input 1',
+            manufacturer: 'Test Manufacturer'
+          }
+        };
+        
+        mockMIDIAccess.onstatechange(event);
+        
+        // Should not have been called again since note was already released
+        expect(noteOffHandler).not.toHaveBeenCalled();
+      });
+    });
+  });
+
 });
 
 function dispatchMidi(status: number, data1: number, data2: number) {
-  mockMIDIInput.onmidimessage({
-    data: new Uint8Array([status, data1, data2])
-  });
+  const input1 = (mockMIDIAccess.inputs.get('input1') as any);
+  if (input1?.onmidimessage) {
+    input1.onmidimessage({
+      data: new Uint8Array([status, data1, data2])
+    });
+  }
 }
